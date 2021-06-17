@@ -269,15 +269,3 @@ class TextField(Field):
         super().__init__(name,'text',False,default)
 
 
-class User(Model):
-    id=IntegerField("id")
-    name=StringField("username")
-    email=StringField("email")
-    password=StringField("password")
-
-if __name__=='__main__':
-    print(111)
-    u = User(id=12345, name='Michael', email='test@orm.org', password='my-pwd')
-    #u.find("Michael")
-    # 保存到数据库：
-    #u.save()
