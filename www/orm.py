@@ -81,17 +81,17 @@ class ModelMetaclass(type):
     3.bases代表被动态修改的类的所有父类
     4.代表被动态修改的类的所有属性、方法组成的 字典
     '''
-    def __new__(cls,name,bases,attrs):
-        #1.排除对 ORM的基类本身 的修改
-        if name=='Model':
-            return type.__name__(cls,name,bases,attrs)
+    def __new__(mcs, name, bases, attrs):
+        # 排除 Model 类本身
+        if name == 'Model':
+            return type.__new__(mcs, name, bases, attrs)
         #2.1.获取table名
         tableName=attrs.get('__table__',None) or name
         print("发现model %s(table:%s)"%(name,tableName))
         #2.2获取所有字段和主键名称
         mappings=dict()
         fields=[]
-        primaryKey=None
+        primary_key =None
         # 如果找到'字段'属性,则保存到__mappings__,
         for k,v in attrs.items():
             if isinstance(v,Field):
@@ -99,13 +99,13 @@ class ModelMetaclass(type):
                 mappings[k]=v
                 #发现主键
                 if v.primary_key:
-                    if primaryKey:
+                    if primary_key :
                         raise RuntimeError('Duplicate primary key for field: %s' % k)
-                    primaryKey = k
+                    primary_key  = k
                 else:
                     fields.append(k)
         #如果没有发现主键
-        if not primaryKey:
+        if not primary_key:
             raise RuntimeError('没找到Primary key ')
         #同时从类属性中删除该属性
         for k in mappings.keys():
@@ -119,14 +119,16 @@ class ModelMetaclass(type):
         #3.保存映射,列等
         attrs['__mappings__']=mappings
         attrs['__table__']=tableName#把表名保存在 __table__ 里
-        attrs['__primary_key__']=primaryKey
-        attrs['__select__'] = 'SELECT %s, %s FROM %s' % (primaryKey, ', '.join(fields), tableName)
+        attrs['__primary_key__']=primary_key
+        # 除主键外的属性名
+        attrs['__fields__'] = fields
+        attrs['__select__'] = 'SELECT %s, %s FROM %s' % (primary_key, ', '.join(fields), tableName)
         attrs['__insert__'] = 'INSERT INTO %s (%s, %s) VALUES (%s)' % (
-            tableName, ', '.join(fields), primaryKey, create_args_string(len(fields) + 1))
+            tableName, ', '.join(fields), primary_key, create_args_string(len(fields) + 1))
         attrs['__update__'] = 'UPDATE %s SET %s WHERE %s = ?' % (
-            tableName, ', '.join(map(lambda f: '%s = ?' % (mappings.get(f).name or f), fields)), primaryKey)
-        attrs['__delete__'] = 'DELETE FROM %s WHERE %s = ?' % (tableName, primaryKey)
-        return type.__new__(cls, name, bases, attrs)
+            tableName, ', '.join(map(lambda f: '%s = ?' % (mappings.get(f).name or f), fields)), primary_key)
+        attrs['__delete__'] = 'DELETE FROM %s WHERE %s = ?' % (tableName, primary_key)
+        return type.__new__(mcs, name, bases, attrs)
 
 # ORM的基类
 # 继承自字典,可以使用字典所有功能 如 user['id']
@@ -154,7 +156,7 @@ class Model(dict,metaclass=ModelMetaclass):
                 value=field.default() if callable(field.default) else field.default
                 logging.debug("使用默认值 %s:%s"%(key,str(value)))
                 setattr(self,key,value)
-            return value
+            return valueprimary_key 
 
     @classmethod
     async def find_all(cls,where=None,args=None,**kw):
@@ -165,7 +167,62 @@ class Model(dict,metaclass=ModelMetaclass):
         if args is None:
             args=[]
         order_by=kw.get('order_by',None)
-        
+        if order_by:
+            sql.append('ORDER BY')
+            sql.append(order_by)
+        limit=kw.get('limit',None)
+        if limit is not None:
+            sql.append("LIMIT")
+            if isinstance(limit,int):
+                sql.append('?')
+                args.append(limit)
+            elif isinstance(limit,tuple) and len(limit)==2:
+                sql.append('?,?')
+                # 在 args 末尾一次性添加 limit 中的所有值
+                args.extend(limit)
+            else:
+                raise ValueError("limit子句数值错误: %s "%str(limit))
+        rows= await select(" ".join(sql),args)
+        return [cls(**row) for row in rows]
+
+    @classmethod
+    async def find_number(cls,select_field,where=None,args=None):
+        sql=['SELECT %s _num_ FROM %s'%(select_field,cls.__table__)]
+        if where:
+            sql.append('WHERE')
+            sql.append(where)
+        rows=await select(" ".join(sql),args,1)
+        if len(rows)==0:
+            return None
+        return rows[0]['_num_']    
+
+    @classmethod
+    async def find(cls,primary_key):
+        rows= await select('%s WHERE %s =?'%(cls.__select__,cls.__primary_key__),[primary_key],1)
+        if len(rows)==0:
+            return None
+        return cls(**rows[0])
+
+    async def save(self):
+        args=list(map(self.getValueOrDefault,self.__fields__))
+        args.append(self.getValueOrDefault(self.__primary_key__))
+        rows=await execute(self.__insert__,args)
+        if rows!=1:
+            logging.warning("插入失败: affected rows: %s" % rows)
+
+    async def update(self):
+        args=list(map(self.getValue,self.__fields__))
+        args.append(self.getValue(self.__primary_key__))
+        rows=await execute(self.__update__,args)
+        if rows!=1:
+            logging.warning("更新失败:affected rows :%s"%rows)
+
+    async def remove(self):
+        args=[self.getValue(self.__primary_key__)]
+        print("args: %s"%args)
+        rows =await execute(self.__delete__,args)
+        if rows!=1:
+            logging.warning("删除失败:affected rows :%s"%rows)
 
 
     '''
@@ -182,14 +239,14 @@ class Model(dict,metaclass=ModelMetaclass):
         print("SQL: %s" %sql)
         print("ARGS:%s"%str(args))
     '''
-class Field:
+class Field(object):
     def __init__(self,name,column_type,primary_key,default) -> None:
         self.name=name
         self.column_type=column_type
-        self.primary=primary_key
+        self.primary_key=primary_key
         self.default=default
     def __str__(self) -> str:
-        return '<%s:%s>'%(self.__class__.__name__,self.column_type,self.name)
+        return '<%s:%s:%s>'%(self.__class__.__name__,self.column_type,self.name)
 
 class BooleanField(Field):
     def __init__(self, name=None,default=None) -> None:
@@ -221,5 +278,6 @@ class User(Model):
 if __name__=='__main__':
     print(111)
     u = User(id=12345, name='Michael', email='test@orm.org', password='my-pwd')
+    #u.find("Michael")
     # 保存到数据库：
-    u.save()
+    #u.save()
