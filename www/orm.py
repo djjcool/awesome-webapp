@@ -156,7 +156,7 @@ class Model(dict,metaclass=ModelMetaclass):
                 value=field.default() if callable(field.default) else field.default
                 logging.debug("使用默认值 %s:%s"%(key,str(value)))
                 setattr(self,key,value)
-            return valueprimary_key 
+            return value
 
     @classmethod
     async def find_all(cls,where=None,args=None,**kw):
