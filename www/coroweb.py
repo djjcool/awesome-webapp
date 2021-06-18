@@ -23,3 +23,17 @@ def get(path):
         wrapper.__route__=path
         return wrapper
     return decorator
+
+def post(path):
+    """Define decorator @post('/path')
+    Args:
+        path ([str]): [资源链接]
+    """
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            return func(*args, **kwargs)
+        wrapper.__method__='POST'
+        wrapper.__route__=path
+        return wrapper
+    return decorator
