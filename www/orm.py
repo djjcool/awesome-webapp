@@ -33,7 +33,7 @@ async def create_pool(loop,**kw):
 
 async def select(sql,args,size=None):
     """第三个参数用于限定获取数据大小"""
-    logging.log(sql,args)
+    logging.info(sql,args)
     global __pool
     async with __pool.acquire() as conn:
         cur= await conn.cursor(aiomysql.DictCursor)
@@ -50,16 +50,16 @@ async def select(sql,args,size=None):
 #INSERT UPDATE DELETE
 async def execute(sql,args,autocommit=True):
     """执行"""
-    logging.log(sql)
+    logging.info(sql)
     async with __pool.acquire() as conn:
         if not autocommit:
             await conn.begin()
         try:
             cur=await conn.cursor()
             # 这里利用 sql 占位符 替换 字符串,防止sql注入
-            await cur.execute(sql.replace("?","%s"),args or ()) 
+            await cur.execute(sql.replace("?","%s"),args) 
             # 此处返回的执行结果数
-            affected=cur.rowcount()
+            affected=cur.rowcount
             if not autocommit:
                 await cur.commit()
         except BaseException:
@@ -154,12 +154,12 @@ class Model(dict,metaclass=ModelMetaclass):
         #如果value为空,定位 Key,如果不为空则返回
         if value is None:
             field=self.__mappings__[key]
-            if field.default() is not None:
+            if field.default is not None:
                 # 如果field.default不为空,就赋值给value
                 value=field.default() if callable(field.default) else field.default
                 logging.debug("使用存在的默认值 %s:%s"%(key,str(value)))
                 setattr(self,key,value)
-            return value
+        return value
 
     @classmethod
     async def find_all(cls,where=None,args=None,**kw):
@@ -214,7 +214,9 @@ class Model(dict,metaclass=ModelMetaclass):
 
     # Model类里添加的实例方法可以让所有子类调用
     async def save(self):
+        print(self.__fields__)
         args=list(map(self.getValueOrDefault,self.__fields__))
+        print(args)
         args.append(self.getValueOrDefault(self.__primary_key__))
         rows=await execute(self.__insert__,args)
         if rows!=1:
@@ -250,6 +252,7 @@ class Model(dict,metaclass=ModelMetaclass):
         print("ARGS:%s"%str(args))
     '''
 class Field(object):
+    # 字段名,类型,是否为主键,如果不传参默认值是什么
     def __init__(self,name,column_type,primary_key,default) -> None:
         self.name=name
         self.column_type=column_type
@@ -259,7 +262,7 @@ class Field(object):
         return '<%s:%s:%s>'%(self.__class__.__name__,self.column_type,self.name)
 
 class BooleanField(Field):
-    def __init__(self, name=None,default=None) -> None:
+    def __init__(self, name=None,default=False) -> None:
         super().__init__(name,'boolean',False,default)
 
 class StringField(Field):
