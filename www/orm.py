@@ -142,43 +142,50 @@ class Model(dict,metaclass=ModelMetaclass):
             return self[key]
         except KeyError:
             raise AttributeError(r"'Model'对象没有%s属性"%key)
+    #设置属性
     def __setattr__(self, key: str, value: Any) -> None:
         self[key] =value
-
+    #通过属性获取值
     def getValue(self,key):
         return getattr(self,key,None)
 
     def getValueOrDefault(self,key):
         value=getattr(self,key,None)
+        #如果value为空,定位 Key,如果不为空则返回
         if value is None:
             field=self.__mappings__[key]
             if field.default() is not None:
+                # 如果field.default不为空,就赋值给value
                 value=field.default() if callable(field.default) else field.default
-                logging.debug("使用默认值 %s:%s"%(key,str(value)))
+                logging.debug("使用存在的默认值 %s:%s"%(key,str(value)))
                 setattr(self,key,value)
             return value
 
     @classmethod
     async def find_all(cls,where=None,args=None,**kw):
         sql=[cls.__select__]
-        if where:
+        if where:# 如果where有值则加上字符串 WHERE 和变量where
             sql.append('WHERE')
             sql.append(where)
-        if args is None:
+        if args is None: # 如果find_all函数没有传入where 则将'[]'传入 args
             args=[]
+        #如果 order_by的值不存在,则返回空值
         order_by=kw.get('order_by',None)
         if order_by:
             sql.append('ORDER BY')
             sql.append(order_by)
+        #如果 limit的值不存在,则返回空值
         limit=kw.get('limit',None)
         if limit is not None:
             sql.append("LIMIT")
+            #如果 limit为整数
             if isinstance(limit,int):
                 sql.append('?')
                 args.append(limit)
+            #如果 limit为元组且只有两个元素
             elif isinstance(limit,tuple) and len(limit)==2:
                 sql.append('?,?')
-                # 在 args 末尾一次性添加 limit 中的所有值
+                # 就把limit加在末尾
                 args.extend(limit)
             else:
                 raise ValueError("limit子句数值错误: %s "%str(limit))
@@ -187,6 +194,7 @@ class Model(dict,metaclass=ModelMetaclass):
 
     @classmethod
     async def find_number(cls,select_field,where=None,args=None):
+        #找到选中的数和它的位置
         sql=['SELECT %s _num_ FROM %s'%(select_field,cls.__table__)]
         if where:
             sql.append('WHERE')
@@ -198,11 +206,13 @@ class Model(dict,metaclass=ModelMetaclass):
 
     @classmethod
     async def find(cls,primary_key):
+        # 通过主键查找对象
         rows= await select('%s WHERE %s =?'%(cls.__select__,cls.__primary_key__),[primary_key],1)
         if len(rows)==0:
             return None
         return cls(**rows[0])
 
+    # Model类里添加的实例方法可以让所有子类调用
     async def save(self):
         args=list(map(self.getValueOrDefault,self.__fields__))
         args.append(self.getValueOrDefault(self.__primary_key__))
