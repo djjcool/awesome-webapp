@@ -1,5 +1,4 @@
-from collections import defaultdict
-import logging,aiomysql,asyncio
+import logging,aiomysql
 from typing import Any
 from aiohttp.web import main
 from attr import field
