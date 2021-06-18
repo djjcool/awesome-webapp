@@ -19,7 +19,7 @@ async def create_pool(loop,**kw):
     __pool=await aiomysql.create_pool(
         # 字典的get方法其实就是如果key不存在,备选后面的
         host=kw.get('host','localhost'),
-        port=kw.get('port','3306'),
+        port=kw.get('port',3306),
         user=kw['user'],
         password=kw['password'],
         db=kw['db'],
