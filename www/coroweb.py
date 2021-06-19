@@ -2,12 +2,10 @@ import functools
 import inspect
 import logging
 import os
-
+from apis import APIError
 from urllib import parse
 
 from aiohttp import web
-
-#from apis import APIError
 
 def get(path):
     """Define decorator @get('/path')
@@ -154,4 +152,28 @@ class RequestHandler(object):
         if kwargs is None:
             kwargs=dict(**request.match_info)
         else:
-            pass
+            if not self.__has_var_kwarg and self.__name_kwargs:
+                # 移除全部 unnamed kwargs
+                copy=dict()
+                for name in self.__name_kwargs:
+                    if name in kwargs:
+                        copy[name]=kwargs[name]
+                kwargs=copy
+            # 检查命名关键字参数
+            for k,v in request.match_info.items():
+                if k in kwargs:
+                     logging.warning('Duplicate arg name in named kwargs and kwargs: %s' % k)
+                kwargs[k]=v
+        if self.__has_request_arg:
+            kwargs['request']=request
+        #检查requierd kwargs
+        if self.__required_kwargs:
+            for name in self.__required_kwargs:
+                if name not in kwargs:
+                    return web.HTTPBadRequest(text="缺少参数 %s"%name)
+        logging.info("call with kwargs : %s"%str(kwargs))
+        try:
+            r= await self.__func(**kwargs)
+            return r
+        except APIError  as e:
+            return dict(error=e.error,data=e.data,message=e.message)
