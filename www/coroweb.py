@@ -123,3 +123,35 @@ class RequestHandler(object):
         self.__has_named_kwarg=has_named_kwarg(fn)
         self.__name_kwargs=get_named_kwargs(fn)
         self.__required_kwargs=get_require_kwargs(fn)
+
+    #使得类可以被调用
+    async def __call__(self,request):
+        kwargs=None
+        if self.__has_named_kwarg or self.__has_var_kwarg or self.__required_kwargs:
+            if request.method=="POST":
+                if not request.content_type:
+                    return web.HTTPBadRequest(text="Missing Content-Type")
+                ct =request.content_type.lower()
+                #解析json
+                if ct.startswith('application/json'):
+                    params=await request.json()
+                    if not isinstance(params,dict):
+                        return web.HTTPBadRequest(text="JSON body must be dict object")
+                    kwargs=params
+                #form 表单编码为 字典形式发送到服务器
+                elif ct.startswith("appliction/x-www-form-urlencoded") or ct.startswith("multipart/form-data"):
+                    params=await request.post()
+                    kwargs=dict(**params)
+                else:
+                    return web.HTTPBadRequest(text="Unsupported Content-Type: %s"%request.content_type)
+            if request.method == 'GET':
+                qs=request.query_string
+                if qs:
+                    kwargs=dict()
+                     # {'id': ['10']}
+                    for k,v in parse.parse_qs(qs,True).items():
+                        kwargs[k]=v[0]
+        if kwargs is None:
+            kwargs=dict(**request.match_info)
+        else:
+            pass
