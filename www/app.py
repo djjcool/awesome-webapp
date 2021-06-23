@@ -30,6 +30,27 @@ def init_jinja2(app,**kwargs):
             env.filters[name] = f
     app['__templating__'] = env
 
+async def logger_factory(app,handler):
+    async def logger(request):
+        logging.info('Request: %s %s' % (request.method, request.path))
+        return await handler(request)
+    return logger
+
+async def data_factory(app,handler):
+    async def parse_data(request):
+        #JSON数据
+        if request.content_type.startswith('application/json'):
+            # Read request body decoded as json
+            request.__data__ = await request.json()
+            logging.info('Request json: %s' % str(request.__data__))
+        # form 表单数据被编码为 key/value 格式发送到服务器（表单默认的提交数据的格式）
+        elif request.content_type.startswith('application/x-www-form-urlencoded'):
+            # Read POST parameters from request body
+            request.__data__ = await request.post()
+            logging.info('Request form: %s' % str(request.__data__))
+        return await handler(request)
+    return parse_data
+
 async def index(request):
     return web.Response(body=b"<h1>Awesome</h1>'",content_type='text/html')
 
