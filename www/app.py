@@ -1,4 +1,5 @@
 import logging
+from re import template
 from ssl import Options;logging.basicConfig(level=logging.INFO)
 import asyncio,os,json,time,orm
 from datetime import datetime
@@ -50,6 +51,45 @@ async def data_factory(app,handler):
             logging.info('Request form: %s' % str(request.__data__))
         return await handler(request)
     return parse_data
+
+
+async def response_factory(app,handler):
+    async def response(request):
+        logging.info("response handler")
+        r=await handler(request)
+        if isinstance(r,web.StreamResponse):
+            return r
+        if isinstance(r,bytes):
+            resp=web.Response(body=r)
+            #二进制数据处理
+            resp.content_type='application/octet-stream'
+            return resp
+        if isinstance(r,str):
+            if r.startswith('redirect'):
+                return web.HTTPFound(r[9:])
+            resp=web.Response(body=r.encode('utf-8'))
+            resp.content_type='text/html;charset=UTF-8'
+            return resp
+        if isinstance(r,dict):
+            template=r.get("__template__")
+            if template is None:
+                # 这里dumps是使用序列化r为JSON
+                # default函数为把任意对象变成一个可序列为JSON的对象(也就是字典)
+                # __dict__魔法方法可获取任意class内部的属性,并且以字典形式存在
+                # https://docs.python.org/3/library/json.html#json.dumps
+                resp=web.Response(body=json.dumps(r,ensure_ascii=False,default=lambda o:o.__dict__).encode("utf-8"))
+            resp.content_type= 'application/json; charset=UTF-8'
+            return resp
+        else:
+            #加载模板,渲染模板
+            #app['__templating__'] 是Environment 对象
+            resp=web.Response(body=app['__templating__'.get_template(template).render(**r).encode('utf-8')])
+            resp.content_type='text/html;charset=UTF-8'
+            return resp
+        # 服务器状态码
+        if isinstance(r,int) and 100<=r<600:
+            return web.Response(status=r)
+
 
 async def index(request):
     return web.Response(body=b"<h1>Awesome</h1>'",content_type='text/html')
