@@ -10,7 +10,8 @@ from attr import field
 
 
 async def create_pool(loop,**kw):
-    """创建异步连接池
+    """
+    创建异步连接池
     这里使用字典解析为参数的方式
     """
     logging.info("创建数据库连接池...")
@@ -31,7 +32,9 @@ async def create_pool(loop,**kw):
 
 
 async def select(sql,args,size=None):
-    """第三个参数用于限定获取数据大小"""
+    """
+    第三个参数用于限定获取数据大小
+    """
     logging.info(sql,args)
     global __pool
     async with __pool.acquire() as conn:
@@ -129,9 +132,11 @@ class ModelMetaclass(type):
         attrs['__delete__'] = 'DELETE FROM %s WHERE %s = ?' % (tableName, primary_key)
         return type.__new__(mcs, name, bases, attrs)
 
-# ORM的基类
-# 继承自字典,可以使用字典所有功能 如 user['id']
+
 class Model(dict,metaclass=ModelMetaclass):
+    """ORM的基类
+    继承自字典,可以使用字典所有功能 如 user['id'].
+    """
     def __init__(self,**kw):
         super(Model,self).__init__(**kw)
 
@@ -162,6 +167,8 @@ class Model(dict,metaclass=ModelMetaclass):
 
     @classmethod
     async def find_all(cls,where=None,args=None,**kw):
+        """ 查询全部值
+        """
         sql=[cls.__select__]
         if where:# 如果where有值则加上字符串 WHERE 和变量where
             sql.append('WHERE')
@@ -193,7 +200,8 @@ class Model(dict,metaclass=ModelMetaclass):
 
     @classmethod
     async def find_number(cls,select_field,where=None,args=None):
-        #找到选中的数和它的位置
+        """找到选中的数和它的位置
+        """
         sql=['SELECT %s _num_ FROM %s'%(select_field,cls.__table__)]
         if where:
             sql.append('WHERE')
@@ -205,7 +213,8 @@ class Model(dict,metaclass=ModelMetaclass):
 
     @classmethod
     async def find(cls,primary_key):
-        # 通过主键查找对象
+        """通过主键查找对象
+        """
         rows= await select('%s WHERE %s =?'%(cls.__select__,cls.__primary_key__),[primary_key],1)
         if len(rows)==0:
             return None
@@ -213,6 +222,8 @@ class Model(dict,metaclass=ModelMetaclass):
 
     # Model类里添加的实例方法可以让所有子类调用
     async def save(self):
+        """执行插入对象数据
+        """
         print(self.__fields__)
         args=list(map(self.getValueOrDefault,self.__fields__))
         print(args)
@@ -222,6 +233,8 @@ class Model(dict,metaclass=ModelMetaclass):
             logging.warning("插入失败: affected rows: %s" % rows)
 
     async def update(self):
+        """执行更新对象数据
+        """
         args=list(map(self.getValue,self.__fields__))
         args.append(self.getValue(self.__primary_key__))
         rows=await execute(self.__update__,args)
@@ -229,6 +242,8 @@ class Model(dict,metaclass=ModelMetaclass):
             logging.warning("更新失败:affected rows :%s"%rows)
 
     async def remove(self):
+        """执行删除数据
+        """
         args=[self.getValue(self.__primary_key__)]
         print("args: %s"%args)
         rows =await execute(self.__delete__,args)
@@ -251,7 +266,8 @@ class Model(dict,metaclass=ModelMetaclass):
         print("ARGS:%s"%str(args))
     '''
 class Field(object):
-    # 字段名,类型,是否为主键,如果不传参默认值是什么
+    """字段名/类型/主键/默认值
+    """
     def __init__(self,name,column_type,primary_key,default) -> None:
         self.name=name
         self.column_type=column_type
