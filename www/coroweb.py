@@ -184,8 +184,8 @@ class RequestHandler(object):
             return dict(error=e.error,data=e.data,message=e.message)
 
 def add_static(app):
-    """添加静态资源对象到路由
-
+    """为返回的静态文件添加一个路由和一个handler
+     /www/static
     Args:
         app ([obejct]): 当前app对象
     """
@@ -194,10 +194,8 @@ def add_static(app):
     logging.info("add static %s =>%s"%('/static/',path))
     
 def add_route(app,fn):
-    """注册url处理函数
-    拿到 method 和 path 属性
-    然后封装好添加给 aiohttp 框架
-
+    """注册url处理函数,拿到 method 和 path 属性,然后封装好添加给 aiohttp 框架
+    当 handler 是正则函数时，内部会转为协程 
     Args:
         app ([object]): 当前app对象
         fn (function): 当前要注册的url
@@ -209,8 +207,8 @@ def add_route(app,fn):
     path=getattr(fn,'__method__',None)
     if path is None or method is None:
         raise ValueError('@get or @post not defined in %s'%str(fn))
-    if not asyncio.iscoroutinefunction(fn) and not inspect.isgeneratorfunction(fn):
-        fn=asyncio.coroutine(fn)
+    #if not asyncio.iscoroutinefunction(fn) and not inspect.isgeneratorfunction(fn):
+    #    fn=asyncio.coroutine(fn)
     logging.info('add route %s %s=>%s(%s)'%(method,path,fn.__name__,",".join(inspect.signature(fn).parameters.keys())))
     app.router.add_route(method,path,RequestHandler(app,fn))
 #把多次add_route调用换成自动扫描
@@ -218,11 +216,17 @@ def add_routes(app,module_name):
     """把多次add_route调用换成自动扫描
     """
     n=module_name.rfind(".")
+    # For package.module, n = 7
+    # For module, n = -1
     if n==(-1):
+        # 导入 module
         mod = __import__(module_name,globals(),locals())
     else:
+        # package.module ,name =module 进行导入
         name=module_name[n+1:]
+        # Import package.module,等价于 'from package import module', fromlist = [module]
         mod=getattr(__import__(module_name[:n],globals(),locals(),name))
+    # module的属性字典
     for attr in dir(mod):
         if attr.startswith("_"):
             continue
