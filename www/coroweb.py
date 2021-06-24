@@ -1,4 +1,5 @@
 import asyncio, os, inspect, logging, functools
+from typing import overload
 from urllib import parse
 from aiohttp import web
 from apis import APIError
@@ -41,7 +42,6 @@ def get_require_kwargs(fn):
     # signature可以返回参数列表,是个ordered mapping
     # https://docs.python.org/zh-cn/3.8/library/inspect.html?highlight=inspect#module-inspect
     params=inspect.signature(fn).parameters
-    print("coroweb line49:",params)
     for name,param in params.items():
         if param.kind==param.KEYWORD_ONLY and param.default is param.empty:
             args.append(name)
@@ -64,7 +64,7 @@ def has_named_kwarg(fn):
     """
     判断是否有命名关键字参数
 
-    :param fn: function
+    :param fn: 函数
     :return:
     """
     # 获取函数 fn 的参数，ordered mapping
@@ -106,10 +106,19 @@ def has_request_arg(fn):
                 "Request 参数必须作为函数的最后一个命名参数: %s %s"%(fn.__name__,str(sig)))
     return found
 
-#目的是从url中分析其要接收的参数,从request中获取必要参数
-#调用URL函数,把结果转换为web.Response对象,使其符合aiohttp的要求
+#
 class RequestHandler(object):
+    """目的是从url中分析其要接收的参数,从request中获取必要参数
+    调用URL函数,把结果转换为web.Response对象,使其符合aiohttp的要求
+    """
     def __init__(self,app,fn) -> None:
+        """目的是从url中分析其要接收的参数,从request中获取必要参数
+        调用URL函数,把结果转换为web.Response对象,使其符合aiohttp的要求
+
+        Args:
+            app ([obejct]): 当前app
+            fn (function): 待处理函数,用于构建参数
+        """
         self.__app=app
         self.__func=fn
         self.__has_request_arg=has_request_arg(fn)
@@ -175,12 +184,28 @@ class RequestHandler(object):
             return dict(error=e.error,data=e.data,message=e.message)
 
 def add_static(app):
+    """添加静态资源对象到路由
+
+    Args:
+        app ([obejct]): 当前app对象
+    """
     path=os.path.join(os.path.dirname(os.path.abspath(__file__)),'static')
     app.router.add_static('/static/',path)
     logging.info("add static %s =>%s"%('/static/',path))
-#注册url处理函数
+    
 def add_route(app,fn):
-    method=getattr(fn,'__method__',None)
+    """注册url处理函数
+    拿到 method 和 path 属性
+    然后封装好添加给 aiohttp 框架
+
+    Args:
+        app ([object]): 当前app对象
+        fn (function): 当前要注册的url
+
+    Raises:
+        ValueError: 没有定义是GET还是POST方法
+    """
+    method=getattr(fn,'__method__',None) #反射
     path=getattr(fn,'__method__',None)
     if path is None or method is None:
         raise ValueError('@get or @post not defined in %s'%str(fn))
@@ -190,6 +215,8 @@ def add_route(app,fn):
     app.router.add_route(method,path,RequestHandler(app,fn))
 #把多次add_route调用换成自动扫描
 def add_routes(app,module_name):
+    """把多次add_route调用换成自动扫描
+    """
     n=module_name.rfind(".")
     if n==(-1):
         mod = __import__(module_name,globals(),locals())
