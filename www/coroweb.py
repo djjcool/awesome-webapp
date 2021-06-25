@@ -211,7 +211,7 @@ def add_route(app,fn):
     #    fn=asyncio.coroutine(fn)
     logging.info('add route %s %s=>%s(%s)'%(method,path,fn.__name__,",".join(inspect.signature(fn).parameters.keys())))
     app.router.add_route(method,path,RequestHandler(app,fn))
-#把多次add_route调用换成自动扫描
+    
 def add_routes(app,module_name):
     """把多次add_route调用换成自动扫描
     """
