@@ -228,6 +228,7 @@ class Model(dict,metaclass=ModelMetaclass):
         args=list(map(self.getValueOrDefault,self.__fields__))
         print(args)
         args.append(self.getValueOrDefault(self.__primary_key__))
+        print(self.__insert__,args)
         rows=await execute(self.__insert__,args)
         if rows!=1:
             logging.warning("插入失败: affected rows: %s" % rows)

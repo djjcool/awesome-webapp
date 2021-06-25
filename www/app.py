@@ -107,10 +107,8 @@ async def response_factory(app,handler):
 
 def datetime_filter(t):
     """时间过滤器
-
     Args:
         t ([datetime]): 时间戳秒
-
     Returns:
         [unicode字符串]: ["x分钟前"这样的时间表示字符串]
     """
