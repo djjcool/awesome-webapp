@@ -3,7 +3,7 @@ import json,logging,inspect,functools
 JSON API definition.
 '''
 class APIError(Exception):
-    """he base APIError which contains error(required), data(optional) and message(optional).
+    """ APIError 的基类包含 error(required), data(optional) 和 message(optional).
     """
     def __init__(self, error,data='',message=''):
         super(APIError,self).__init__(message)
