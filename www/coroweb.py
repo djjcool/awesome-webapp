@@ -1,5 +1,4 @@
 import asyncio, os, inspect, logging, functools
-from typing import overload
 from urllib import parse
 from aiohttp import web
 from apis import APIError
@@ -204,7 +203,7 @@ def add_route(app,fn):
         ValueError: 没有定义是GET还是POST方法
     """
     method=getattr(fn,'__method__',None) #反射
-    path=getattr(fn,'__method__',None)
+    path=getattr(fn,'__route__',None)
     if path is None or method is None:
         raise ValueError('@get or @post not defined in %s'%str(fn))
     #if not asyncio.iscoroutinefunction(fn) and not inspect.isgeneratorfunction(fn):
@@ -214,6 +213,10 @@ def add_route(app,fn):
     
 def add_routes(app,module_name):
     """把多次add_route调用换成自动扫描
+
+    Args:
+        app ([type]): [当前app对象]
+        module_name ([str]): [自动化扫描包名导入路由定义]
     """
     n=module_name.rfind(".")
     # For package.module, n = 7

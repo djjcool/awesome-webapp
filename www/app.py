@@ -82,14 +82,14 @@ async def response_factory(app,handler):
                 # __dict__魔法方法可获取任意class内部的属性,并且以字典形式存在
                 # https://docs.python.org/3/library/json.html#json.dumps
                 resp=web.Response(body=json.dumps(r,ensure_ascii=False,default=lambda o:o.__dict__).encode("utf-8"))
-            resp.content_type= 'application/json; charset=UTF-8'
-            return resp
-        else:
-            #加载模板,渲染模板
-            #app['__templating__'] 是Environment 对象
-            resp=web.Response(body=app['__templating__'.get_template(template).render(**r).encode('utf-8')])
-            resp.content_type='text/html;charset=UTF-8'
-            return resp
+                resp.content_type= 'application/json; charset=UTF-8'
+                return resp
+            else:
+                #加载模板,渲染模板
+                #app['__templating__'] 是Environment 对象
+                resp=web.Response(body=app['__templating__'.get_template(template).render(**r).encode('utf-8')])
+                resp.content_type='text/html;charset=UTF-8'
+                return resp
         # 服务器状态码
         if isinstance(r,int) and 100<=r<600:
             return web.Response(status=r)
@@ -129,6 +129,7 @@ async def init_db(app):
     如果在Linux系统运行,避免使用root作为用户名
     """
     await orm.create_pool(
+        
         host=configs.db.host,
         port=configs.db.port,
         user=configs.db.user,
@@ -137,12 +138,20 @@ async def init_db(app):
     )
 
 
-def init():
+
+    
+
+    
+
+
+
+
+if __name__=='__main__':
     # 加载自己的中间件
     app=web.Application(middlewares=[logger_factory,response_factory])
     # 加载自己的时间过滤器
     init_jinja2(app,filter=dict(datetime=datetime_filter))
-    add_route(app,"handlers")
+    add_routes(app,'handlers')
     add_static(app)
     app.on_startup.append(init_db)
     '''
@@ -152,11 +161,5 @@ def init():
     '''
     
     web.run_app(app,host='localhost',port=9000)
-
-    
-
-
-if __name__=='__main__':
-    init()
 
 

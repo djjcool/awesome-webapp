@@ -9,7 +9,7 @@ from attr import field
 
 
 
-async def create_pool(loop,**kw):
+async def create_pool(**kw):
     """
     创建异步连接池
     这里使用字典解析为参数的方式
@@ -26,8 +26,8 @@ async def create_pool(loop,**kw):
         charset=kw.get('charset','utf8'),
         autocommit=kw.get('autocommit',True),
         maxsize=kw.get('maxsize',10),
-        minsize=kw.get('minisize',1),
-        loop=loop
+        minsize=kw.get('minisize',1)#,
+        #loop=loop
     )
 
 
